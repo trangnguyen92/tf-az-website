@@ -4,5 +4,5 @@
 # same region and resource group instead of silently relying on variables.tf
 # defaults. Secrets stay in the gitignored terraform.tfvars / CI secrets.
 
-location            = "westeurope"
+location            = "swedencentral"
 resource_group_name = "tf-az-webserver-rg"
