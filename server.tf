@@ -15,7 +15,7 @@ resource "azurerm_linux_virtual_machine" "server" {
   name                = "server-vm"
   location            = azurerm_resource_group.main.location
   resource_group_name = azurerm_resource_group.main.name
-  size                = "Standard_B1s"
+  size                = "Standard_D2als_v6"
   admin_username      = "azureuser"
 
   network_interface_ids = [

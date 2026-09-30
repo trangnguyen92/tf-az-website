@@ -11,7 +11,7 @@ terraform {
 
   backend "azurerm" {
     resource_group_name  = "tf-az-webserver-state-rg"
-    storage_account_name = "tfazwebserverstate"
+    storage_account_name = "tfazwebsitestate"
     container_name       = "tfstate"
     key                  = "tf-az-webserver.tfstate"
   }

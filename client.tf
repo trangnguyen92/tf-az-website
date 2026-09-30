@@ -24,7 +24,7 @@ resource "azurerm_windows_virtual_machine" "client" {
   name                = "client-vm"
   location            = azurerm_resource_group.main.location
   resource_group_name = azurerm_resource_group.main.name
-  size                = "Standard_B1s"
+  size                = "Standard_D2als_v6"
   admin_username      = var.client_admin_username
   admin_password      = var.client_admin_password
 

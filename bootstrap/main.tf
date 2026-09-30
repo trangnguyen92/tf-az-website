@@ -16,7 +16,7 @@ provider "azurerm" {
 
 variable "location" {
   type    = string
-  default = "westeurope"
+  default = "northeurope"
 }
 
 resource "azurerm_resource_group" "state" {
@@ -25,7 +25,7 @@ resource "azurerm_resource_group" "state" {
 }
 
 resource "azurerm_storage_account" "state" {
-  name                     = "tfazwebserverstate"
+  name                     = "tfazwebsitestate"
   resource_group_name      = azurerm_resource_group.state.name
   location                 = azurerm_resource_group.state.location
   account_tier             = "Standard"
