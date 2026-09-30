@@ -1,0 +1,10 @@
+# terraform.tfvars.example
+# Copy this file to terraform.tfvars and fill in real values.
+# terraform.tfvars is gitignored — never commit it.
+
+location               = "westeurope"
+resource_group_name    = "tf-az-webserver-rg"
+operator_ips           = ["203.0.113.5/32"]
+client_admin_username  = "azureadmin"
+client_admin_password  = "ChangeMe123!ChangeMe"
+server_ssh_public_key  = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... your-key-comment"
