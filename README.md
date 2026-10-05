@@ -87,8 +87,10 @@ network topology, not just firewall rule.
   `deploy-approver` environment and applies exactly that saved plan. If the
   state changed in between, Terraform rejects the plan as stale. It is
   filtered by path: it only runs when a `.tf` file, something under
-  `cloud-init/`, or the workflow itself changed, so docs-only pushes don't
-  trigger a deploy. Editing `cloud-init/server.yaml` replaces the server VM.
+  `cloud-init/` or `site/`, or the workflow itself changed, so docs-only
+  pushes don't trigger a deploy. Editing `site/index.html` updates the page
+  in place (via a CustomScript VM extension); editing
+  `cloud-init/server.yaml` replaces the server VM.
 - Changed only a secret (e.g. `OPERATOR_IPS` after your IP changed) with no
   matching file change? Run it manually instead of a throwaway commit:
   Actions tab → "Deploy Terraform" → "Run workflow".

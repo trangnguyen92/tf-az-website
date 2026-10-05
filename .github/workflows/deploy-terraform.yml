@@ -10,6 +10,7 @@ on:
     paths:
       - '**.tf'
       - 'cloud-init/**'
+      - 'site/**'
       - '.github/workflows/deploy-terraform.yml'
       - '.github/actions/**'
   workflow_dispatch:

@@ -39,15 +39,9 @@ resource "azurerm_linux_virtual_machine" "server" {
     version   = "latest"
   }
 
-  # Load-bearing ordering inside cloud-init/server.yaml: cloud-init runs
-  # `write_files` BEFORE `packages` installs nginx, and the "Hello World" page
-  # survives only because Ubuntu's nginx package does not overwrite an existing
-  # /var/www/html/index.html. A future reordering or a different web server
-  # package would silently clobber it.
-  #
   # NOTE: any edit to cloud-init/server.yaml — including a comment — changes
-  # custom_data, which forces replacement of this VM. Treat edits to that file
-  # as destructive and plan them deliberately.
+  # custom_data, which forces replacement of this VM. Page content lives in
+  # site/index.html instead (see the extension below), so it can change in place.
   custom_data = base64encode(file("${path.module}/cloud-init/server.yaml"))
 
   # cloud-init needs outbound internet to `apt install nginx`, and this
@@ -55,4 +49,20 @@ resource "azurerm_linux_virtual_machine" "server" {
   # apply can create the VM before the NAT association finishes and cloud-init
   # fails with no internet access.
   depends_on = [azurerm_subnet_nat_gateway_association.server]
+}
+
+# Writes site/index.html onto the server. Changing the page changes `settings`,
+# which updates this extension in place and re-runs the command — the VM is
+# not replaced. Waiting for cloud-init first ensures nginx is installed.
+resource "azurerm_virtual_machine_extension" "server_web_content" {
+  name                       = "web-content"
+  virtual_machine_id         = azurerm_linux_virtual_machine.server.id
+  publisher                  = "Microsoft.Azure.Extensions"
+  type                       = "CustomScript"
+  type_handler_version       = "2.1"
+  auto_upgrade_minor_version = true
+
+  settings = jsonencode({
+    commandToExecute = "cloud-init status --wait; mkdir -p /var/www/html && echo ${base64encode(file("${path.module}/site/index.html"))} | base64 -d > /var/www/html/index.html"
+  })
 }
