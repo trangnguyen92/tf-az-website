@@ -1,0 +1,90 @@
+# .github/workflows/deploy-terraform.yml
+name: Deploy Terraform
+
+# Only runs on main (a merged PR, or a manual run from main) go past plan.
+# Pull requests and manual runs from any other branch stop after plan.
+on:
+  pull_request:
+  push:
+    branches: [main]
+    paths:
+      - '**.tf'
+      - 'cloud-init/**'
+      - '.github/workflows/deploy-terraform.yml'
+      - '.github/actions/**'
+  workflow_dispatch:
+    inputs:
+      destroy:
+        description: 'Destroy all resources instead of applying'
+        type: boolean
+        default: false
+
+# All runs share one remote state lock, so serialize them.
+concurrency:
+  group: terraform-state
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+  ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+  ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+  TF_VAR_operator_ips: ${{ secrets.OPERATOR_IPS }}
+  TF_VAR_client_admin_password: ${{ secrets.CLIENT_ADMIN_PASSWORD }}
+  TF_VAR_server_ssh_public_key: ${{ secrets.SERVER_SSH_PUBLIC_KEY }}
+  TF_PLAN_PASSPHRASE: ${{ secrets.TF_PLAN_PASSPHRASE }}
+
+jobs:
+  plan:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/terraform-init
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+      - name: Terraform Validate
+        run: terraform validate
+      - name: Terraform Plan
+        if: ${{ !inputs.destroy }}
+        run: terraform plan -input=false -out=tfplan
+      - name: Terraform Plan (destroy)
+        if: ${{ inputs.destroy }}
+        run: terraform plan -destroy -input=false -out=tfplan
+      # A saved plan holds the sensitive TF_VAR values in plaintext, so only
+      # an encrypted copy leaves the runner.
+      - name: Encrypt plan
+        if: github.ref == 'refs/heads/main'
+        run: openssl enc -aes-256-cbc -pbkdf2 -salt -in tfplan -out tfplan.enc -pass env:TF_PLAN_PASSPHRASE
+      - uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/main'
+        with:
+          name: tfplan
+          path: tfplan.enc
+          retention-days: 1
+
+  execute:
+    name: Deploy
+    needs: plan
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: deploy-approver
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/terraform-init
+      - uses: actions/download-artifact@v4
+        with:
+          name: tfplan
+      - name: Decrypt plan
+        run: openssl enc -d -aes-256-cbc -pbkdf2 -in tfplan.enc -out tfplan -pass env:TF_PLAN_PASSPHRASE
+      # Applying the saved plan runs exactly the reviewed changes; Terraform
+      # refuses it as stale if the state changed since it was planned.
+      - name: Terraform Apply
+        if: ${{ !inputs.destroy }}
+        run: terraform apply -input=false tfplan
+      - name: Terraform Destroy
+        if: ${{ inputs.destroy }}
+        run: terraform apply -input=false tfplan
