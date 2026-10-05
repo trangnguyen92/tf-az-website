@@ -2,15 +2,6 @@
 package_update: true
 packages:
   - nginx
-write_files:
-  - path: /var/www/html/index.html
-    content: |
-      <html>
-        <head><title>Hello World</title></head>
-        <body><h1>Hello World, I am Trang</h1></body>
-      </html>
-    owner: root:root
-    permissions: '0644'
 runcmd:
   - systemctl enable nginx
   - systemctl restart nginx
