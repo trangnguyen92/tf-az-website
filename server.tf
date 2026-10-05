@@ -12,11 +12,12 @@ resource "azurerm_network_interface" "server" {
 }
 
 resource "azurerm_linux_virtual_machine" "server" {
-  name                = "server-vm"
-  location            = azurerm_resource_group.main.location
-  resource_group_name = azurerm_resource_group.main.name
-  size                = "Standard_D2als_v6"
-  admin_username      = "azureuser"
+  name                              = "server-vm"
+  location                          = azurerm_resource_group.main.location
+  resource_group_name               = azurerm_resource_group.main.name
+  size                              = "Standard_D2als_v6"
+  admin_username                    = "azureuser"
+  vm_agent_platform_updates_enabled = true
 
   network_interface_ids = [
     azurerm_network_interface.server.id,
