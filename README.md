@@ -15,23 +15,23 @@ serving "Hello World" over nginx.
                      │  Public IP     │
                      └───────┬────────┘
         ┌────────────────────┼────────────────────────────┐
-        │  VNet (10.0.0.0/16)│                             │
-        │  ┌─────────────────▼──────────┐                  │
-        │  │ client-subnet (10.0.1.0/24)│                  │
-        │  │  Windows Server 2022 VM    │                  │
-        │  │  (RDP jump box)            │                  │
-        │  └─────────────┬───────────────┘                 │
-        │                │ TCP 80, 22 (client subnet only) │
-        │  ┌─────────────▼───────────────┐                 │
-        │  │ server-subnet (10.0.2.0/24) │                 │
-        │  │  Ubuntu 22.04 VM, no public IP│               │
-        │  │  nginx → "Hello World"      │                 │
-        │  └─────────────┬───────────────┘                 │
-        │                │ outbound only (apt install)     │
-        │        ┌───────▼────────┐                        │
-        │        │  NAT Gateway   │────────► Internet       │
-        │        └────────────────┘   (outbound only)      │
-        └───────────────────────────────────────────────────┘
+        │  VNet (10.0.0.0/16)│                            │
+        │  ┌─────────────────▼──────────┐                 │
+        │  │ client-subnet (10.0.1.0/24)│                 │
+        │  │  Windows Server 2022 VM    │                 │
+        │  │  (RDP jump box)            │                 │
+        │  └─────────────┬───────────────┘                │
+        │                │ TCP 80, 22 (client subnet only)│
+        │  ┌─────────────▼───────────────┐                │
+        │  │ server-subnet (10.0.2.0/24) │                │
+        │  │  Ubuntu 22.04 VM, no public IP│              │
+        │  │  nginx → "Hello World"      │                │
+        │  └─────────────┬───────────────┘                │
+        │                │ outbound only (apt install)    │
+        │        ┌───────▼────────┐                       │
+        │        │  NAT Gateway   │────────► Internet     │
+        │        └────────────────┘   (outbound only)     │
+        └─────────────────────────────────────────────────┘
 ```
 
 The server has no public IP and its NSG only allows inbound traffic
@@ -65,20 +65,34 @@ network topology, not just firewall rule.
    gh secret set OPERATOR_IPS --body '["<same value(s) as terraform.tfvars operator_ips, e.g. 203.0.113.5/32>"]'
    gh secret set CLIENT_ADMIN_PASSWORD --body "<same value as terraform.tfvars client_admin_password>"
    gh secret set SERVER_SSH_PUBLIC_KEY --body "$(cat ~/.ssh/tf-az-webserver.pub)"
+   gh secret set TF_PLAN_PASSPHRASE --body "$(openssl rand -base64 32)"
    ```
+   `TF_PLAN_PASSPHRASE` encrypts the saved plan passed from the plan job to
+   the approved apply/destroy job (a saved plan holds the sensitive
+   variables in plaintext).
+5. Create the `deploy-approver` environment with required reviewers
+   (Settings → Environments → New environment → `deploy-approver` → Required
+   reviewers). The apply and destroy jobs wait for an approval from one of
+   these reviewers.
 
 ## Deploying
 
-- Open a PR against `main` → `terraform-ci.yml` runs `fmt`, `validate`, and
-  `plan`. It triggers on *every* pull request, regardless of which files
-  changed.
-- Merge to `main` → `terraform-apply.yml` applies automatically. Unlike CI,
-  apply is filtered by path: it only runs when a `.tf` file, something under
-  `cloud-init/`, or the apply workflow itself changed, so docs-only pushes
-  don't trigger a billable apply.
+- Open any pull request → `deploy-terraform.yml` runs `fmt`, `validate`, and
+  `plan` only (the apply job is skipped). It triggers on *every* pull
+  request, regardless of target branch or which files changed.
+- Run "Deploy Terraform" manually from a feature branch → `plan` only. Only
+  runs on `main` go on to the approval and apply/destroy job.
+- Merge to `main` → `deploy-terraform.yml` runs `plan` (review it in the plan
+  job's log), then the `apply` job waits for approval on the
+  `deploy-approver` environment and applies exactly that saved plan. If the
+  state changed in between, Terraform rejects the plan as stale. It is
+  filtered by path: it only runs when a `.tf` file, something under
+  `cloud-init/`, or the workflow itself changed, so docs-only pushes don't
+  trigger a deploy. Editing `cloud-init/server.yaml` replaces the server VM.
 - Changed only a secret (e.g. `OPERATOR_IPS` after your IP changed) with no
-  matching file change? Trigger `terraform-apply.yml` manually instead of a
-  throwaway commit: Actions tab → "Terraform Apply" → "Run workflow".
-- Run the `Terraform Destroy` workflow manually (Actions tab →
-  "Terraform Destroy" → "Run workflow") to tear everything down
-  between sessions and control cost.
+  matching file change? Run it manually instead of a throwaway commit:
+  Actions tab → "Deploy Terraform" → "Run workflow".
+- To tear everything down between sessions and control cost, run "Deploy
+  Terraform" manually with **destroy** ticked. It runs `plan -destroy`, then
+  the `destroy` job waits for approval on `deploy-approver` and executes that
+  saved destroy plan.
