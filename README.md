@@ -50,7 +50,7 @@ network topology, not just firewall rule.
 4. Create the CI/CD Service Principal:
    ```bash
    az ad sp create-for-rbac \
-     --name "tf-az-webserver-ci" \
+     --name "tf-az-website-ci" \
      --role Contributor \
      --scopes /subscriptions/$(az account show --query id -o tsv) \
      --sdk-auth
